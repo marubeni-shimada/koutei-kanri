@@ -27,11 +27,18 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .gtask{font-weight:800;font-size:13px}.gstep{font-size:12px;color:var(--sub);padding-left:14px}
 .gtl{flex:1;position:relative}
 .gcols{position:absolute;inset:0;display:flex;z-index:0}
-.gcol{flex:1;border-right:1px solid var(--line)}
-.gcol.we{background:color-mix(in srgb,var(--sub) 7%,transparent)}
-.gcol.m0{background:color-mix(in srgb,var(--acc) 5%,transparent)}
-.ghd{display:flex}.ghd .t{flex:1;text-align:center;font-size:10.5px;color:var(--sub);padding:5px 0;border-right:1px solid var(--line);white-space:nowrap}
+.gcol{flex:1;border-right:1px solid transparent}
+.gcol.we{background:color-mix(in srgb,var(--sub) 6%,transparent)}
+.gcol.wk{border-right:1px solid var(--line)}
+.gcol.m0{border-right:2px solid color-mix(in srgb,var(--acc) 45%,var(--line))}
+.ghd{display:flex}.ghd .t{flex:1;text-align:left;font-size:10.5px;color:var(--sub);padding:5px 0 4px 3px;white-space:nowrap;overflow:visible;border-right:1px solid transparent}
+.ghd .t.wk{border-right:1px solid var(--line)}
+.ghd .t.m0{border-right:2px solid color-mix(in srgb,var(--acc) 45%,var(--line))}
 .ghd .t.mstart{font-weight:800;color:var(--ink)}
+.ghd.ghday{border-top:1px solid var(--line)}
+.ghd.ghday .t{font-size:10px;color:var(--sub);text-align:center;padding:4px 0}
+.ghd.ghday .t.we{color:color-mix(in srgb,var(--todayln) 55%,var(--sub))}
+.ghd.ghday .t.m0{color:var(--ink);font-weight:800}
 .gbar{position:absolute;top:7px;height:22px;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;cursor:grab;z-index:1;box-shadow:0 1px 3px rgba(0,0,0,.15);touch-action:none;user-select:none}
 .gbar.dragging{cursor:grabbing;opacity:.9;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:5}
 .gbar .pf{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);border-right:2px solid rgba(255,255,255,.7)}
@@ -68,7 +75,7 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
   <label class="btn sub" style="cursor:pointer">📂 読み込み<input type="file" id="impFile" accept=".json" style="display:none"></label>
   <button class="btn sub" id="demoBtn">サンプルを入れる</button>
   <span id="gasState" class="gstate off" title="クラウド保存(GAS)の状態">● 未接続</span>
-  <div class="scale">表示 <div class="seg" id="scaleSeg"><button data-s="day">日</button><button data-s="week" class="on">週</button></div></div>
+  <div class="scale">表示 <div class="seg" id="scaleSeg"><button data-s="week" class="on">週</button><button data-s="month">月</button></div></div>
 </div>
 <div class="gwrap"><div class="gant" id="gant"></div></div>
 <p class="note" id="foot"></p>
@@ -117,28 +124,35 @@ const fmt=d=>(d.getMonth()+1)+'/'+d.getDate();
 const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
 const dayDiff=(a,b)=>Math.round((b-a)/864e5);
+const monStart=d=>new Date(d.getFullYear(),d.getMonth(),1);
+const monEnd=d=>new Date(d.getFullYear(),d.getMonth()+1,0);
 function range(){
+  // カレンダーは「丸ごと月単位」の固定グリッド（端が月初・月末でそろう＝日付がズレない）
   let min=null,max=null;
   DATA.tasks.forEach(t=>t.steps.forEach(s=>{const a=D(s.s),b=D(s.e);if(!min||a<min)min=a;if(!max||b>max)max=b;}));
-  if(!min){min=new Date(today);max=addDays(today,21);}
-  min=addDays(min,-2);max=addDays(max,2);
-  if(today<min)min=addDays(today,-1);if(today>max)max=addDays(today,1);
+  if(!min){min=new Date(today);max=addDays(today,30);}
+  if(today<min)min=new Date(today); if(today>max)max=new Date(today);
+  min=monStart(min); max=monEnd(max);
   return {min,max,days:dayDiff(min,max)+1};
 }
 function render(){
   const g=document.getElementById('gant');
   if(!DATA.tasks.length){g.innerHTML='<div class="empty">タスクがありません。「＋ タスクを追加」から始めてください。</div>';return;}
   const {min,max,days}=range();
-  const colW=scale==='week'?22:34;
+  const colW=scale==='week'?26:9;   // 週表示=1日26px（日付が全部入る）／月表示=1日9px
   const totalW=230+days*colW;
-  // ヘッダー（日付目盛）
-  let cols='',hd='';
-  for(let i=0;i<days;i++){const d=addDays(min,i),wd=d.getDay(),we=wd===0||wd===6,m0=d.getDate()===1;
-    cols+='<div class="gcol'+(we?' we':'')+(m0?' m0':'')+'"></div>';
-    const show= scale==='day' ? true : (wd===1||i===0); // 週表示は月曜と先頭だけラベル
-    hd+='<div class="t'+(m0?' mstart':'')+'">'+(show?(m0?((d.getMonth()+1)+'月'):fmt(d)):'')+'</div>';
+  // ヘッダー（上段＝月名／下段＝日付）
+  let cols='',monRow='',dayRow='';
+  for(let i=0;i<days;i++){const d=addDays(min,i),wd=d.getDay(),we=wd===0||wd===6,m0=d.getDate()===1,mon=wd===1;
+    const colCls=m0?'m0':(scale==='week'&&mon?'wk':'');
+    cols+='<div class="gcol'+(colCls?' '+colCls:'')+(scale==='week'&&we?' we':'')+'"></div>';
+    const bc=m0?'m0':(mon?'wk':'');
+    monRow+='<div class="t'+(bc?' '+bc:'')+(m0?' mstart':'')+'">'+(m0?((d.getMonth()+1)+'月'):'')+'</div>';
+    // 下段の日付：週表示=毎日／月表示=月曜だけ（混み過ぎ防止）
+    const showDay = scale==='week' ? true : mon;
+    dayRow+='<div class="t day'+(we?' we':'')+(bc?' '+bc:'')+'">'+(showDay?d.getDate():'')+'</div>';
   }
-  let h='<div class="grow head"><div class="gleft head"><b>タスク / 工程</b></div><div class="gtl"><div class="ghd">'+hd+'</div></div></div>';
+  let h='<div class="grow head"><div class="gleft head"><b>タスク / 工程</b></div><div class="gtl"><div class="ghd">'+monRow+'</div><div class="ghd ghday">'+dayRow+'</div></div></div>';
   // 今日線位置
   const todayX=230+(dayDiff(min,today)+0.5)*colW;
   DATA.tasks.forEach((t,ti)=>{
