@@ -29,6 +29,7 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .gcols{position:absolute;inset:0;display:flex;z-index:0}
 .gcol{flex:1;border-right:1px solid transparent}
 .gcol.we{background:color-mix(in srgb,var(--sub) 6%,transparent)}
+.gcol.dayline{border-right:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
 .gcol.wk{border-right:1px solid var(--line)}
 .gcol.m0{border-right:2px solid color-mix(in srgb,var(--acc) 45%,var(--line))}
 .ghd{display:flex}.ghd .t{flex:1;text-align:left;font-size:10.5px;color:var(--sub);padding:5px 0 4px 3px;white-space:nowrap;overflow:visible;border-right:1px solid transparent}
@@ -39,6 +40,7 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .ghd.ghday .t{font-size:10px;color:var(--sub);text-align:center;padding:4px 0}
 .ghd.ghday .t.we{color:color-mix(in srgb,var(--todayln) 55%,var(--sub))}
 .ghd.ghday .t.m0{color:var(--ink);font-weight:800}
+.ghd.ghday .t .wd{font-size:9px;opacity:.75;margin-left:1px}
 .gbar{position:absolute;top:7px;height:22px;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;cursor:grab;z-index:1;box-shadow:0 1px 3px rgba(0,0,0,.15);touch-action:none;user-select:none}
 .gbar.dragging{cursor:grabbing;opacity:.9;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:5}
 .gbar .pf{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);border-right:2px solid rgba(255,255,255,.7)}
@@ -75,7 +77,7 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
   <label class="btn sub" style="cursor:pointer">📂 読み込み<input type="file" id="impFile" accept=".json" style="display:none"></label>
   <button class="btn sub" id="demoBtn">サンプルを入れる</button>
   <span id="gasState" class="gstate off" title="クラウド保存(GAS)の状態">● 未接続</span>
-  <div class="scale">表示 <div class="seg" id="scaleSeg"><button data-s="week" class="on">週</button><button data-s="month">月</button></div></div>
+  <div class="scale">表示 <div class="seg" id="scaleSeg"><button data-s="week" class="on">週（拡大）</button><button data-s="month">月（全体）</button></div></div>
 </div>
 <div class="gwrap"><div class="gant" id="gant"></div></div>
 <p class="note" id="foot"></p>
@@ -99,7 +101,7 @@ function scheduleGas(){ if(!GAS_URL)return; clearTimeout(_gasT); _gasT=setTimeou
 function pushGas(){ if(!GAS_URL)return; setGas('loading');
   fetch(GAS_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(DATA)}).then(()=>setGas('on')).catch(()=>setGas('err')); }
 function pullGas(){ if(!GAS_URL){setGas('off');return;} setGas('loading');
-  fetch(GAS_URL+'?t='+Date.now()).then(r=>r.json()).then(d=>{ if(d&&d.tasks&&d.tasks.length){ DATA=d; try{localStorage.setItem(LS,JSON.stringify(DATA));}catch(e){} render(); } setGas('on'); }).catch(()=>setGas('err')); }
+  fetch(GAS_URL+'?t='+Date.now()).then(r=>r.json()).then(d=>{ if(d&&d.tasks&&d.tasks.length){ DATA=d; try{localStorage.setItem(LS,JSON.stringify(DATA));}catch(e){} render(); if(scale==='week')scrollToToday(); } setGas('on'); }).catch(()=>setGas('err')); }
 function demo(){
   return {tasks:[
     {id:'t1',name:'入金ツール改修',steps:[
@@ -118,7 +120,7 @@ function demo(){
   ]};
 }
 let scale='week',today=new Date();today.setHours(0,0,0,0);
-let GCTX={colW:22,min:null};   // ドラッグ計算用（1日あたり幅・左端の日付）
+let GCTX={colW:22,min:null,todayX:0};   // ドラッグ計算用（1日あたり幅・左端の日付）＋今日線X
 const D=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c);};
 const fmt=d=>(d.getMonth()+1)+'/'+d.getDate();
 const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -139,18 +141,19 @@ function render(){
   const g=document.getElementById('gant');
   if(!DATA.tasks.length){g.innerHTML='<div class="empty">タスクがありません。「＋ タスクを追加」から始めてください。</div>';return;}
   const {min,max,days}=range();
-  const colW=scale==='week'?26:9;   // 週表示=1日26px（日付が全部入る）／月表示=1日9px
+  // 月表示＝1ヶ月を日付付きで俯瞰（1日26px）／週表示＝1週間をズーム（1日100px・1画面に1週間ほど）
+  const colW=scale==='week'?100:26;
+  const WD=['日','月','火','水','木','金','土'];
   const totalW=230+days*colW;
   // ヘッダー（上段＝月名／下段＝日付）
   let cols='',monRow='',dayRow='';
   for(let i=0;i<days;i++){const d=addDays(min,i),wd=d.getDay(),we=wd===0||wd===6,m0=d.getDate()===1,mon=wd===1;
-    const colCls=m0?'m0':(scale==='week'&&mon?'wk':'');
-    cols+='<div class="gcol'+(colCls?' '+colCls:'')+(scale==='week'&&we?' we':'')+'"></div>';
+    const colCls=m0?'m0':(mon?'wk':'dayline');
+    cols+='<div class="gcol'+(colCls?' '+colCls:'')+(we?' we':'')+'"></div>';
     const bc=m0?'m0':(mon?'wk':'');
     monRow+='<div class="t'+(bc?' '+bc:'')+(m0?' mstart':'')+'">'+(m0?((d.getMonth()+1)+'月'):'')+'</div>';
-    // 下段の日付：週表示=毎日／月表示=月曜だけ（混み過ぎ防止）
-    const showDay = scale==='week' ? true : mon;
-    dayRow+='<div class="t day'+(we?' we':'')+(bc?' '+bc:'')+'">'+(showDay?d.getDate():'')+'</div>';
+    // 下段：日付（両表示とも毎日）。週表示は曜日も付ける
+    dayRow+='<div class="t day'+(we?' we':'')+(bc?' '+bc:'')+'">'+d.getDate()+(scale==='week'?' <span class="wd">'+WD[wd]+'</span>':'')+'</div>';
   }
   let h='<div class="grow head"><div class="gleft head"><b>タスク / 工程</b></div><div class="gtl"><div class="ghd">'+monRow+'</div><div class="ghd ghday">'+dayRow+'</div></div></div>';
   // 今日線位置
@@ -172,7 +175,7 @@ function render(){
         +'<span class="glbl">'+esc(s.name)+'（'+fmt(a)+'〜'+fmt(b)+'）'+(s.p>0?' '+s.p+'%':'')+'</span></div></div></div>';
     });
   });
-  g.style.width=totalW+'px';g.innerHTML=h;GCTX.colW=colW;GCTX.min=min;
+  g.style.width=totalW+'px';g.innerHTML=h;GCTX.colW=colW;GCTX.min=min;GCTX.todayX=todayX;
   // 今日線（ヘッダー下〜全体）
   const tl=document.createElement('div');tl.className='today';tl.style.left=todayX+'px';tl.style.top='0';
   tl.innerHTML='<div class="lbl">今日 '+fmt(today)+'</div>';g.appendChild(tl);
@@ -223,12 +226,13 @@ document.getElementById('expBtn').onclick=()=>{ const blob=new Blob([JSON.string
 document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{ try{const d=JSON.parse(r.result);if(d&&d.tasks){ if(DATA.tasks.length&&!confirm('読み込んだデータで置き換えます。よろしいですか？')){e.target.value='';return;} DATA=d;save();render(); }else alert('タスク工程のJSONではないようです。'); }catch(x){alert('読み込めませんでした：'+x.message);} e.target.value=''; };
   r.readAsText(f); };
-document.getElementById('scaleSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(b){scale=b.dataset.s;document.querySelectorAll('#scaleSeg button').forEach(x=>x.classList.toggle('on',x===b));render();}};
+function scrollToToday(){ const w=document.querySelector('.gwrap'); if(w) w.scrollLeft=Math.max(0,GCTX.todayX-350); }
+document.getElementById('scaleSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(b){scale=b.dataset.s;document.querySelectorAll('#scaleSeg button').forEach(x=>x.classList.toggle('on',x===b));render();if(scale==='week')scrollToToday();}};
 document.getElementById('gant').onclick=e=>{
   if(_justDragged){_justDragged=false;return;}   // ドラッグ直後のクリックは無視
   const as=e.target.closest('[data-addstep]');if(as){openStep(+as.dataset.addstep,null);return;}
   const dt=e.target.closest('[data-delt]');if(dt){if(confirm('このタスクを削除しますか？')){DATA.tasks.splice(+dt.dataset.delt,1);save();render();}return;}
-  const ds=e.target.closest('[data-dels]');if(ds){const[t,s]=ds.dataset.dels.split(',').map(Number);DATA.tasks[t].steps.splice(s,1);save();render();return;}
+  const ds=e.target.closest('[data-dels]');if(ds){const[t,s]=ds.dataset.dels.split(',').map(Number);const nm=(DATA.tasks[t].steps[s]||{}).name||'この工程';if(confirm('工程「'+nm+'」を削除しますか？')){DATA.tasks[t].steps.splice(s,1);save();render();}return;}
 };
 /* ===== 帯のドラッグ（移動＝期間ごと前後／端で伸縮） ===== */
 let _justDragged=false;
@@ -258,5 +262,6 @@ document.getElementById('gant').addEventListener('pointerdown',e=>{
   document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up);
 });
 render();
+if(scale==='week')scrollToToday();
 if(GAS_URL)pullGas(); else setGas('off');
 </script></body></html>
