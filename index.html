@@ -22,9 +22,13 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .gant{position:relative;min-width:760px}
 .grow{display:flex;border-bottom:1px solid var(--line);min-height:40px}
 .grow.head{position:sticky;top:0;background:var(--card);z-index:3;min-height:auto}
-.gleft{width:230px;flex-shrink:0;padding:8px 12px;border-right:1px solid var(--line);position:sticky;left:0;background:var(--card);z-index:2}
+.gleft{width:258px;flex-shrink:0;padding:8px 12px;border-right:1px solid var(--line);position:sticky;left:0;background:var(--card);z-index:2}
 .gleft.head{z-index:4}
-.gtask{font-weight:800;font-size:13px}.gstep{font-size:12px;color:var(--sub);padding-left:14px}
+.gtask{font-weight:800;font-size:13px}.gstep{font-size:12px;color:var(--sub)}
+.chk{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border:1.5px solid var(--line);border-radius:5px;margin-right:7px;cursor:pointer;color:#fff;font-size:11px;font-weight:900;vertical-align:-3px;flex-shrink:0}
+.chk:hover{border-color:var(--ok)}
+.chk.on{background:var(--ok);border-color:var(--ok)}
+.gleft .gstep{padding-left:0}
 .gtl{flex:1;position:relative}
 .gcols{position:absolute;inset:0;display:flex;z-index:0}
 .gcol{flex:1;border-right:1px solid transparent}
@@ -48,11 +52,21 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .gbar .gh{position:absolute;top:0;bottom:0;width:9px;z-index:2;cursor:col-resize;background:rgba(255,255,255,.001)}
 .gbar .gh.l{left:0;border-radius:7px 0 0 7px}.gbar .gh.r{right:0;border-radius:0 7px 7px 0}
 .gbar .gh:hover{background:rgba(255,255,255,.35)}
-.tasktitle{display:flex;align-items:center;gap:8px}
+.tasktitle{display:flex;align-items:center;gap:7px;flex-wrap:nowrap;white-space:nowrap}
+.tasktitle .gtask{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tasktitle .mini,.tasktitle .chkall,.tasktitle .del{flex-shrink:0}
 .tasktitle .mini{font-size:10px;color:var(--sub);font-weight:400;background:var(--bg);border-radius:20px;padding:1px 8px}
+.tasktitle .mini.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);font-weight:800}
+/* 完了＝薄く残す */
+.grow.done .gtask{color:var(--sub)}
+.grow.done .gstep{color:var(--sub);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--sub) 60%,transparent)}
+.gbar.done{opacity:.4;filter:grayscale(.35);box-shadow:none}
+.gbar.done .glbl{text-decoration:line-through}
 .today{position:absolute;top:0;bottom:0;width:2px;background:var(--todayln);z-index:2}
 .today .lbl{position:absolute;top:-2px;left:3px;font-size:9px;color:var(--todayln);font-weight:800;white-space:nowrap}
 .addstep{font-size:11px;color:var(--acc);cursor:pointer;font-weight:700;padding-left:14px;margin-top:2px;display:inline-block}
+.chkall{font-size:10px;color:var(--ok);font-weight:700;cursor:pointer;border:1px solid color-mix(in srgb,var(--ok) 40%,var(--line));border-radius:20px;padding:1px 8px}
+.chkall:hover{background:color-mix(in srgb,var(--ok) 12%,transparent)}
 .del{color:var(--sub);cursor:pointer;font-size:11px;margin-left:6px}.del:hover{color:var(--todayln)}
 .empty{padding:30px;text-align:center;color:var(--sub)}
 /* モーダル */
@@ -116,7 +130,11 @@ function demo(){
     {id:'t3',name:'工事台帳分析ツール',steps:[
       {name:'設計',s:'2026-09-28',e:'2026-10-01',c:'--c8',p:100},
       {name:'開発',s:'2026-10-02',e:'2026-10-14',c:'--c1',p:70},
-      {name:'テスト',s:'2026-10-15',e:'2026-10-18',c:'--c2',p:0}]}
+      {name:'テスト',s:'2026-10-15',e:'2026-10-18',c:'--c2',p:0}]},
+    {id:'t4',name:'交際費集計ツール（完了例）',steps:[
+      {name:'要件整理',s:'2026-09-20',e:'2026-09-23',c:'--c8',p:100},
+      {name:'開発',s:'2026-09-24',e:'2026-09-29',c:'--c1',p:100},
+      {name:'チェック',s:'2026-09-30',e:'2026-10-01',c:'--c2',p:100}]}
   ]};
 }
 let scale='week',today=new Date();today.setHours(0,0,0,0);
@@ -144,7 +162,7 @@ function render(){
   // 月表示＝1ヶ月を日付付きで俯瞰（1日26px）／週表示＝1週間をズーム（1日100px・1画面に1週間ほど）
   const colW=scale==='week'?100:26;
   const WD=['日','月','火','水','木','金','土'];
-  const totalW=230+days*colW;
+  const totalW=258+days*colW;
   // ヘッダー（上段＝月名／下段＝日付）
   let cols='',monRow='',dayRow='';
   for(let i=0;i<days;i++){const d=addDays(min,i),wd=d.getDay(),we=wd===0||wd===6,m0=d.getDate()===1,mon=wd===1;
@@ -157,19 +175,20 @@ function render(){
   }
   let h='<div class="grow head"><div class="gleft head"><b>タスク / 工程</b></div><div class="gtl"><div class="ghd">'+monRow+'</div><div class="ghd ghday">'+dayRow+'</div></div></div>';
   // 今日線位置
-  const todayX=230+(dayDiff(min,today)+0.5)*colW;
+  const todayX=258+(dayDiff(min,today)+0.5)*colW;
   DATA.tasks.forEach((t,ti)=>{
     // タスク見出し行（全工程の最小〜最大を薄い帯で）
     let ts=null,te=null;t.steps.forEach(s=>{const a=D(s.s),b=D(s.e);if(!ts||a<ts)ts=a;if(!te||b>te)te=b;});
     const doneAll=t.steps.length&&t.steps.every(s=>s.p>=100);
-    h+='<div class="grow"><div class="gleft"><div class="tasktitle"><span class="gtask">'+esc(t.name)+'</span>'+(doneAll?'<span class="mini">完了</span>':'<span class="mini">'+t.steps.length+'工程</span>')+'<span class="del" data-delt="'+ti+'">削除</span></div><span class="addstep" data-addstep="'+ti+'">＋ 工程を追加</span></div><div class="gtl"><div class="gcols">'+cols+'</div></div></div>';
+    const tcls=doneAll?' done':'';
+    h+='<div class="grow'+tcls+'"><div class="gleft"><div class="tasktitle"><span class="gtask">'+esc(t.name)+'</span>'+(doneAll?'<span class="mini ok" data-chkall="'+ti+'" style="cursor:pointer" title="完了を取り消す">✓ 完了</span>':'<span class="mini">'+t.steps.length+'工程</span><span class="chkall" data-chkall="'+ti+'" title="このタスクを全部完了にする">完了</span>')+'<span class="del" data-delt="'+ti+'">削除</span></div><span class="addstep" data-addstep="'+ti+'">＋ 工程を追加</span></div><div class="gtl"><div class="gcols">'+cols+'</div></div></div>';
     // 工程行
     t.steps.forEach((s,si)=>{
       const a=D(s.s),b=D(s.e),x=(dayDiff(min,a))*colW,w=Math.max(colW*0.6,(dayDiff(a,b)+1)*colW);
-      const col=cssv(s.c||'--c1');
-      h+='<div class="grow"><div class="gleft"><span class="gstep">▸ '+esc(s.name)+'</span><span class="del" data-dels="'+ti+','+si+'">×</span></div>'
+      const col=cssv(s.c||'--c1');const sdone=s.p>=100;
+      h+='<div class="grow'+(sdone?' done':'')+'"><div class="gleft"><span class="chk'+(sdone?' on':'')+'" data-chk="'+ti+','+si+'" title="'+(sdone?'完了を取り消す':'この工程を完了にする')+'">'+(sdone?'✓':'')+'</span><span class="gstep">'+esc(s.name)+'</span><span class="del" data-dels="'+ti+','+si+'">×</span></div>'
         +'<div class="gtl"><div class="gcols">'+cols+'</div>'
-        +'<div class="gbar" data-bar="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
+        +'<div class="gbar'+(sdone?' done':'')+'" data-bar="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
         +(s.p>0?'<i class="pf" style="width:'+Math.min(100,s.p)+'%"></i>':'')
         +'<i class="gh l"></i><i class="gh r"></i>'
         +'<span class="glbl">'+esc(s.name)+'（'+fmt(a)+'〜'+fmt(b)+'）'+(s.p>0?' '+s.p+'%':'')+'</span></div></div></div>';
@@ -230,6 +249,8 @@ function scrollToToday(){ const w=document.querySelector('.gwrap'); if(w) w.scro
 document.getElementById('scaleSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(b){scale=b.dataset.s;document.querySelectorAll('#scaleSeg button').forEach(x=>x.classList.toggle('on',x===b));render();if(scale==='week')scrollToToday();}};
 document.getElementById('gant').onclick=e=>{
   if(_justDragged){_justDragged=false;return;}   // ドラッグ直後のクリックは無視
+  const ck=e.target.closest('[data-chk]');if(ck){const[t,s]=ck.dataset.chk.split(',').map(Number);const st=DATA.tasks[t].steps[s];st.p=(st.p>=100)?0:100;save();render();return;}
+  const ct=e.target.closest('[data-chkall]');if(ct){const t=+ct.dataset.chkall;const all=DATA.tasks[t].steps.every(x=>x.p>=100);DATA.tasks[t].steps.forEach(x=>x.p=all?0:100);save();render();return;}
   const as=e.target.closest('[data-addstep]');if(as){openStep(+as.dataset.addstep,null);return;}
   const dt=e.target.closest('[data-delt]');if(dt){if(confirm('このタスクを削除しますか？')){DATA.tasks.splice(+dt.dataset.delt,1);save();render();}return;}
   const ds=e.target.closest('[data-dels]');if(ds){const[t,s]=ds.dataset.dels.split(',').map(Number);const nm=(DATA.tasks[t].steps[s]||{}).name||'この工程';if(confirm('工程「'+nm+'」を削除しますか？')){DATA.tasks[t].steps.splice(s,1);save();render();}return;}
