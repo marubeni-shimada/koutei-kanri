@@ -57,6 +57,17 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .tasktitle .mini,.tasktitle .chkall,.tasktitle .del{flex-shrink:0}
 .tasktitle .mini{font-size:10px;color:var(--sub);font-weight:400;background:var(--bg);border-radius:20px;padding:1px 8px}
 .tasktitle .mini.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);font-weight:800}
+/* 今日やる＝主張 */
+.grow.now{background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.grow.now .gstep{color:var(--ink);font-weight:800}
+.gbar.now{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--acc);font-weight:900}
+/* 遅れ＝終了日超過で未完 */
+.grow.late{background:color-mix(in srgb,var(--todayln) 8%,transparent)}
+.grow.late .gstep{color:var(--todayln);font-weight:800}
+.gbar.late{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--todayln)}
+.tag{font-size:9.5px;font-weight:800;border-radius:20px;padding:1px 7px;margin-left:2px;flex-shrink:0}
+.tag.now{background:color-mix(in srgb,var(--acc) 15%,transparent);color:var(--acc)}
+.tag.late{background:color-mix(in srgb,var(--todayln) 15%,transparent);color:var(--todayln)}
 /* 完了＝薄く残す */
 .grow.done .gtask{color:var(--sub)}
 .grow.done .gstep{color:var(--sub);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--sub) 60%,transparent)}
@@ -119,8 +130,8 @@ function pullGas(){ if(!GAS_URL){setGas('off');return;} setGas('loading');
 function demo(){
   return {tasks:[
     {id:'t1',name:'入金ツール改修',steps:[
-      {name:'要件整理',s:'2026-10-02',e:'2026-10-05',c:'--c8',p:100},
-      {name:'開発',s:'2026-10-06',e:'2026-10-16',c:'--c1',p:40},
+      {name:'要件整理',s:'2026-09-30',e:'2026-10-05',c:'--c8',p:40},
+      {name:'開発',s:'2026-10-06',e:'2026-10-16',c:'--c1',p:0},
       {name:'チェック',s:'2026-10-17',e:'2026-10-22',c:'--c2',p:0},
       {name:'リリース',s:'2026-10-23',e:'2026-10-24',c:'--c3',p:0}]},
     {id:'t2',name:'展示会 提案資料',steps:[
@@ -128,8 +139,8 @@ function demo(){
       {name:'資料作成',s:'2026-10-11',e:'2026-10-20',c:'--c4',p:0},
       {name:'レビュー',s:'2026-10-21',e:'2026-10-23',c:'--c2',p:0}]},
     {id:'t3',name:'工事台帳分析ツール',steps:[
-      {name:'設計',s:'2026-09-28',e:'2026-10-01',c:'--c8',p:100},
-      {name:'開発',s:'2026-10-02',e:'2026-10-14',c:'--c1',p:70},
+      {name:'設計',s:'2026-09-26',e:'2026-10-01',c:'--c8',p:60},
+      {name:'開発',s:'2026-10-02',e:'2026-10-14',c:'--c1',p:30},
       {name:'テスト',s:'2026-10-15',e:'2026-10-18',c:'--c2',p:0}]},
     {id:'t4',name:'交際費集計ツール（完了例）',steps:[
       {name:'要件整理',s:'2026-09-20',e:'2026-09-23',c:'--c8',p:100},
@@ -186,9 +197,13 @@ function render(){
     t.steps.forEach((s,si)=>{
       const a=D(s.s),b=D(s.e),x=(dayDiff(min,a))*colW,w=Math.max(colW*0.6,(dayDiff(a,b)+1)*colW);
       const col=cssv(s.c||'--c1');const sdone=s.p>=100;
-      h+='<div class="grow'+(sdone?' done':'')+'"><div class="gleft"><span class="chk'+(sdone?' on':'')+'" data-chk="'+ti+','+si+'" title="'+(sdone?'完了を取り消す':'この工程を完了にする')+'">'+(sdone?'✓':'')+'</span><span class="gstep">'+esc(s.name)+'</span><span class="del" data-dels="'+ti+','+si+'">×</span></div>'
+      const isToday = !sdone && today>=a && today<=b;          // 今日が期間内＝今日やる
+      const isLate  = !sdone && today>b;                        // 終了日を過ぎたのに未完＝遅れ
+      const rcls=(sdone?' done':'')+(isToday?' now':'')+(isLate?' late':'');
+      const tag=isLate?'<span class="tag late">⚠ 遅れ</span>':(isToday?'<span class="tag now">▶ 今日</span>':'');
+      h+='<div class="grow'+rcls+'"><div class="gleft"><span class="chk'+(sdone?' on':'')+'" data-chk="'+ti+','+si+'" title="'+(sdone?'完了を取り消す':'この工程を完了にする')+'">'+(sdone?'✓':'')+'</span><span class="gstep">'+esc(s.name)+'</span>'+tag+'<span class="del" data-dels="'+ti+','+si+'">×</span></div>'
         +'<div class="gtl"><div class="gcols">'+cols+'</div>'
-        +'<div class="gbar'+(sdone?' done':'')+'" data-bar="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
+        +'<div class="gbar'+(sdone?' done':'')+(isToday?' now':'')+(isLate?' late':'')+'" data-bar="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
         +(s.p>0?'<i class="pf" style="width:'+Math.min(100,s.p)+'%"></i>':'')
         +'<i class="gh l"></i><i class="gh r"></i>'
         +'<span class="glbl">'+esc(s.name)+'（'+fmt(a)+'〜'+fmt(b)+'）'+(s.p>0?' '+s.p+'%':'')+'</span></div></div></div>';
