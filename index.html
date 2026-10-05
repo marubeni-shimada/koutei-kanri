@@ -29,6 +29,9 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .chk:hover{border-color:var(--ok)}
 .chk.on{background:var(--ok);border-color:var(--ok)}
 .gleft .gstep{padding-left:0}
+.ren{cursor:text;border-radius:4px;padding:1px 3px;margin:-1px -3px}
+.ren:hover{background:color-mix(in srgb,var(--acc) 10%,transparent);box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--acc) 40%,transparent)}
+.reninput{font:inherit;font-weight:700;border:1.5px solid var(--acc);border-radius:5px;padding:2px 6px;background:var(--card);color:var(--ink);max-width:180px}
 .gtl{flex:1;position:relative}
 .gcols{position:absolute;inset:0;display:flex;z-index:0}
 .gcol{flex:1;border-right:1px solid transparent}
@@ -192,7 +195,7 @@ function render(){
     let ts=null,te=null;t.steps.forEach(s=>{const a=D(s.s),b=D(s.e);if(!ts||a<ts)ts=a;if(!te||b>te)te=b;});
     const doneAll=t.steps.length&&t.steps.every(s=>s.p>=100);
     const tcls=doneAll?' done':'';
-    h+='<div class="grow'+tcls+'"><div class="gleft"><div class="tasktitle"><span class="gtask">'+esc(t.name)+'</span>'+(doneAll?'<span class="mini ok" data-chkall="'+ti+'" style="cursor:pointer" title="完了を取り消す">✓ 完了</span>':'<span class="mini">'+t.steps.length+'工程</span><span class="chkall" data-chkall="'+ti+'" title="このタスクを全部完了にする">完了</span>')+'<span class="del" data-delt="'+ti+'">削除</span></div><span class="addstep" data-addstep="'+ti+'">＋ 工程を追加</span></div><div class="gtl"><div class="gcols">'+cols+'</div></div></div>';
+    h+='<div class="grow'+tcls+'"><div class="gleft"><div class="tasktitle"><span class="gtask ren" data-ren="t,'+ti+'" title="クリックで名前を編集">'+esc(t.name)+'</span>'+(doneAll?'<span class="mini ok" data-chkall="'+ti+'" style="cursor:pointer" title="完了を取り消す">✓ 完了</span>':'<span class="mini">'+t.steps.length+'工程</span><span class="chkall" data-chkall="'+ti+'" title="このタスクを全部完了にする">完了</span>')+'<span class="del" data-delt="'+ti+'">削除</span></div><span class="addstep" data-addstep="'+ti+'">＋ 工程を追加</span></div><div class="gtl"><div class="gcols">'+cols+'</div></div></div>';
     // 工程行
     t.steps.forEach((s,si)=>{
       const a=D(s.s),b=D(s.e),x=(dayDiff(min,a))*colW,w=Math.max(colW*0.6,(dayDiff(a,b)+1)*colW);
@@ -201,7 +204,7 @@ function render(){
       const isLate  = !sdone && today>b;                        // 終了日を過ぎたのに未完＝遅れ
       const rcls=(sdone?' done':'')+(isToday?' now':'')+(isLate?' late':'');
       const tag=isLate?'<span class="tag late">⚠ 遅れ</span>':(isToday?'<span class="tag now">▶ 今日</span>':'');
-      h+='<div class="grow'+rcls+'"><div class="gleft"><span class="chk'+(sdone?' on':'')+'" data-chk="'+ti+','+si+'" title="'+(sdone?'完了を取り消す':'この工程を完了にする')+'">'+(sdone?'✓':'')+'</span><span class="gstep">'+esc(s.name)+'</span>'+tag+'<span class="del" data-dels="'+ti+','+si+'">×</span></div>'
+      h+='<div class="grow'+rcls+'"><div class="gleft"><span class="chk'+(sdone?' on':'')+'" data-chk="'+ti+','+si+'" title="'+(sdone?'完了を取り消す':'この工程を完了にする')+'">'+(sdone?'✓':'')+'</span><span class="gstep ren" data-ren="s,'+ti+','+si+'" title="クリックで名前を編集">'+esc(s.name)+'</span>'+tag+'<span class="del" data-dels="'+ti+','+si+'">×</span></div>'
         +'<div class="gtl"><div class="gcols">'+cols+'</div>'
         +'<div class="gbar'+(sdone?' done':'')+(isToday?' now':'')+(isLate?' late':'')+'" data-bar="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
         +(s.p>0?'<i class="pf" style="width:'+Math.min(100,s.p)+'%"></i>':'')
@@ -264,12 +267,26 @@ function scrollToToday(){ const w=document.querySelector('.gwrap'); if(w) w.scro
 document.getElementById('scaleSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(b){scale=b.dataset.s;document.querySelectorAll('#scaleSeg button').forEach(x=>x.classList.toggle('on',x===b));render();if(scale==='week')scrollToToday();}};
 document.getElementById('gant').onclick=e=>{
   if(_justDragged){_justDragged=false;return;}   // ドラッグ直後のクリックは無視
+  const rn=e.target.closest('[data-ren]');if(rn && rn.tagName!=='INPUT'){startRename(rn);return;}
   const ck=e.target.closest('[data-chk]');if(ck){const[t,s]=ck.dataset.chk.split(',').map(Number);const st=DATA.tasks[t].steps[s];st.p=(st.p>=100)?0:100;save();render();return;}
   const ct=e.target.closest('[data-chkall]');if(ct){const t=+ct.dataset.chkall;const all=DATA.tasks[t].steps.every(x=>x.p>=100);DATA.tasks[t].steps.forEach(x=>x.p=all?0:100);save();render();return;}
   const as=e.target.closest('[data-addstep]');if(as){openStep(+as.dataset.addstep,null);return;}
   const dt=e.target.closest('[data-delt]');if(dt){if(confirm('このタスクを削除しますか？')){DATA.tasks.splice(+dt.dataset.delt,1);save();render();}return;}
   const ds=e.target.closest('[data-dels]');if(ds){const[t,s]=ds.dataset.dels.split(',').map(Number);const nm=(DATA.tasks[t].steps[s]||{}).name||'この工程';if(confirm('工程「'+nm+'」を削除しますか？')){DATA.tasks[t].steps.splice(s,1);save();render();}return;}
 };
+/* ===== 名前のインライン編集（タスク名・工程名をクリック） ===== */
+function startRename(span){
+  const p=span.dataset.ren.split(','),isTask=p[0]==='t';
+  const cur=isTask?DATA.tasks[+p[1]].name:DATA.tasks[+p[1]].steps[+p[2]].name;
+  const inp=document.createElement('input');inp.className='reninput';inp.value=cur;
+  span.replaceWith(inp);inp.focus();inp.select();
+  let done=false;
+  const commit=()=>{ if(done)return;done=true; const v=inp.value.trim();
+    if(isTask)DATA.tasks[+p[1]].name=v||cur; else DATA.tasks[+p[1]].steps[+p[2]].name=v||cur;
+    save();render(); };
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ev.preventDefault();inp.blur();} else if(ev.key==='Escape'){done=true;render();} });
+}
 /* ===== 帯のドラッグ（移動＝期間ごと前後／端で伸縮） ===== */
 let _justDragged=false;
 document.getElementById('gant').addEventListener('pointerdown',e=>{
