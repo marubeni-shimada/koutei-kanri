@@ -1,0 +1,215 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>タスク工程スケジュール</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#17233c;--sub:#6a768f;--line:#e4e9f2;--acc:#2f6bff;--ok:#16a06a;--todayln:#e14b4b;
+ --c1:#3a6ff0;--c2:#f0994a;--c3:#16a06a;--c4:#b388ff;--c5:#4fb6e6;--c6:#e26aa0;--c7:#f5c542;--c8:#9aa6bd}
+@media(prefers-color-scheme:dark){:root{--bg:#0c1222;--card:#141c30;--ink:#eaf0ff;--sub:#93a1bf;--line:#273150}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 "Yu Gothic UI","Hiragino Sans","Meiryo",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:20px;font-weight:900}.lead{color:var(--sub);font-size:12px;margin:3px 0 14px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+button,select,input{font:inherit}
+.btn{background:var(--acc);color:#fff;border:0;border-radius:9px;padding:8px 15px;font-weight:700;cursor:pointer}
+.btn.sub{background:var(--card);color:var(--acc);border:1px solid var(--line)}
+input,select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.scale{margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--sub);font-size:12px}
+.scale .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.scale .seg button{background:var(--card);color:var(--ink);border:0;padding:6px 12px;cursor:pointer;font-size:12px}
+.scale .seg button.on{background:var(--acc);color:#fff}
+/* ガント */
+.gwrap{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:auto}
+.gant{position:relative;min-width:760px}
+.grow{display:flex;border-bottom:1px solid var(--line);min-height:40px}
+.grow.head{position:sticky;top:0;background:var(--card);z-index:3;min-height:auto}
+.gleft{width:230px;flex-shrink:0;padding:8px 12px;border-right:1px solid var(--line);position:sticky;left:0;background:var(--card);z-index:2}
+.gleft.head{z-index:4}
+.gtask{font-weight:800;font-size:13px}.gstep{font-size:12px;color:var(--sub);padding-left:14px}
+.gtl{flex:1;position:relative}
+.gcols{position:absolute;inset:0;display:flex;z-index:0}
+.gcol{flex:1;border-right:1px solid var(--line)}
+.gcol.we{background:color-mix(in srgb,var(--sub) 7%,transparent)}
+.gcol.m0{background:color-mix(in srgb,var(--acc) 5%,transparent)}
+.ghd{display:flex}.ghd .t{flex:1;text-align:center;font-size:10.5px;color:var(--sub);padding:5px 0;border-right:1px solid var(--line);white-space:nowrap}
+.ghd .t.mstart{font-weight:800;color:var(--ink)}
+.gbar{position:absolute;top:7px;height:22px;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;cursor:pointer;z-index:1;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.gbar .pf{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);border-right:2px solid rgba(255,255,255,.7)}
+.gbar span{position:relative;z-index:1}
+.tasktitle{display:flex;align-items:center;gap:8px}
+.tasktitle .mini{font-size:10px;color:var(--sub);font-weight:400;background:var(--bg);border-radius:20px;padding:1px 8px}
+.today{position:absolute;top:0;bottom:0;width:2px;background:var(--todayln);z-index:2}
+.today .lbl{position:absolute;top:-2px;left:3px;font-size:9px;color:var(--todayln);font-weight:800;white-space:nowrap}
+.addstep{font-size:11px;color:var(--acc);cursor:pointer;font-weight:700;padding-left:14px;margin-top:2px;display:inline-block}
+.del{color:var(--sub);cursor:pointer;font-size:11px;margin-left:6px}.del:hover{color:var(--todayln)}
+.empty{padding:30px;text-align:center;color:var(--sub)}
+/* モーダル */
+.mask{position:fixed;inset:0;background:rgba(10,15,30,.4);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+.mask.on{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;width:420px;max-width:100%}
+.modal h2{font-size:15px;font-weight:800;margin-bottom:12px}
+.frow{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}.frow label{font-size:12px;color:var(--sub);font-weight:700}
+.frow.two{flex-direction:row;gap:10px}.frow.two>div{flex:1;display:flex;flex-direction:column;gap:4px}
+.swatch{display:flex;gap:6px;flex-wrap:wrap}.swatch i{width:24px;height:24px;border-radius:6px;cursor:pointer;border:2px solid transparent}.swatch i.on{border-color:var(--ink)}
+.mact{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.note{color:var(--sub);font-size:11px;margin-top:14px;line-height:1.7}
+.gstate{font-size:11.5px;font-weight:800;border-radius:20px;padding:5px 11px;border:1px solid var(--line)}
+.gstate.off{color:var(--sub)}.gstate.on{color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.gstate.loading{color:var(--acc)}.gstate.err{color:var(--todayln)}
+</style></head><body><div class="wrap">
+<h1>🗓️ タスク工程スケジュール</h1>
+<p class="lead">タスクを追加し、その中の「工程（開発→チェック、資料整理→資料作成 など）」を期間の帯で見える化します。個人用・このPCに自動保存されます。大事なデータは「書き出し」でバックアップを。</p>
+<div class="bar">
+  <button class="btn" id="addTask">＋ タスクを追加</button>
+  <button class="btn sub" id="expBtn">💾 書き出し</button>
+  <label class="btn sub" style="cursor:pointer">📂 読み込み<input type="file" id="impFile" accept=".json" style="display:none"></label>
+  <button class="btn sub" id="demoBtn">サンプルを入れる</button>
+  <span id="gasState" class="gstate off" title="クラウド保存(GAS)の状態">● 未接続</span>
+  <div class="scale">表示 <div class="seg" id="scaleSeg"><button data-s="day">日</button><button data-s="week" class="on">週</button></div></div>
+</div>
+<div class="gwrap"><div class="gant" id="gant"></div></div>
+<p class="note" id="foot"></p>
+</div>
+
+<div class="mask" id="mask"><div class="modal" id="modal"></div></div>
+<script>
+const LS='task_koutei_v1';
+/* ☁ クラウド保存(GAS)。デプロイしたWebアプリの /exec URL をここに貼ると、Googleスプレッドシートに自動保存＋多端末で同じデータに。空ならローカル(localStorage)だけで動く。 */
+const GAS_URL='https://script.google.com/macros/s/AKfycbz5iROApbC_px40DXzaVw6bX77ewACjzn4Po8WbdcRQ5mVAMmentdb-sjmFinkGagHJ/exec';
+const COLORS=['--c1','--c2','--c3','--c4','--c5','--c6','--c7','--c8'];
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let DATA=load();
+function load(){ try{const d=JSON.parse(localStorage.getItem(LS));if(d&&d.tasks)return d;}catch(e){} return {tasks:[]}; }
+function save(){ try{localStorage.setItem(LS,JSON.stringify(DATA));}catch(e){} scheduleGas(); }
+/* --- GAS 同期（ローカルを即保存＋裏で中央へ。読み込み時は中央を取得して反映） --- */
+function setGas(st){ const el=document.getElementById('gasState'); if(!el)return; el.className='gstate '+st;
+  el.textContent={off:'● ローカルのみ',on:'● クラウド保存中',loading:'● 同期中…',err:'● 接続エラー'}[st]; }
+let _gasT=null;
+function scheduleGas(){ if(!GAS_URL)return; clearTimeout(_gasT); _gasT=setTimeout(pushGas,700); }
+function pushGas(){ if(!GAS_URL)return; setGas('loading');
+  fetch(GAS_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(DATA)}).then(()=>setGas('on')).catch(()=>setGas('err')); }
+function pullGas(){ if(!GAS_URL){setGas('off');return;} setGas('loading');
+  fetch(GAS_URL+'?t='+Date.now()).then(r=>r.json()).then(d=>{ if(d&&d.tasks&&d.tasks.length){ DATA=d; try{localStorage.setItem(LS,JSON.stringify(DATA));}catch(e){} render(); } setGas('on'); }).catch(()=>setGas('err')); }
+function demo(){
+  return {tasks:[
+    {id:'t1',name:'入金ツール改修',steps:[
+      {name:'要件整理',s:'2026-10-02',e:'2026-10-05',c:'--c8',p:100},
+      {name:'開発',s:'2026-10-06',e:'2026-10-16',c:'--c1',p:40},
+      {name:'チェック',s:'2026-10-17',e:'2026-10-22',c:'--c2',p:0},
+      {name:'リリース',s:'2026-10-23',e:'2026-10-24',c:'--c3',p:0}]},
+    {id:'t2',name:'展示会 提案資料',steps:[
+      {name:'資料整理',s:'2026-10-07',e:'2026-10-10',c:'--c5',p:0},
+      {name:'資料作成',s:'2026-10-11',e:'2026-10-20',c:'--c4',p:0},
+      {name:'レビュー',s:'2026-10-21',e:'2026-10-23',c:'--c2',p:0}]},
+    {id:'t3',name:'工事台帳分析ツール',steps:[
+      {name:'設計',s:'2026-09-28',e:'2026-10-01',c:'--c8',p:100},
+      {name:'開発',s:'2026-10-02',e:'2026-10-14',c:'--c1',p:70},
+      {name:'テスト',s:'2026-10-15',e:'2026-10-18',c:'--c2',p:0}]}
+  ]};
+}
+let scale='week',today=new Date();today.setHours(0,0,0,0);
+const D=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c);};
+const fmt=d=>(d.getMonth()+1)+'/'+d.getDate();
+const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+const dayDiff=(a,b)=>Math.round((b-a)/864e5);
+function range(){
+  let min=null,max=null;
+  DATA.tasks.forEach(t=>t.steps.forEach(s=>{const a=D(s.s),b=D(s.e);if(!min||a<min)min=a;if(!max||b>max)max=b;}));
+  if(!min){min=new Date(today);max=addDays(today,21);}
+  min=addDays(min,-2);max=addDays(max,2);
+  if(today<min)min=addDays(today,-1);if(today>max)max=addDays(today,1);
+  return {min,max,days:dayDiff(min,max)+1};
+}
+function render(){
+  const g=document.getElementById('gant');
+  if(!DATA.tasks.length){g.innerHTML='<div class="empty">タスクがありません。「＋ タスクを追加」から始めてください。</div>';return;}
+  const {min,max,days}=range();
+  const colW=scale==='week'?22:34;
+  const totalW=230+days*colW;
+  // ヘッダー（日付目盛）
+  let cols='',hd='';
+  for(let i=0;i<days;i++){const d=addDays(min,i),wd=d.getDay(),we=wd===0||wd===6,m0=d.getDate()===1;
+    cols+='<div class="gcol'+(we?' we':'')+(m0?' m0':'')+'"></div>';
+    const show= scale==='day' ? true : (wd===1||i===0); // 週表示は月曜と先頭だけラベル
+    hd+='<div class="t'+(m0?' mstart':'')+'">'+(show?(m0?((d.getMonth()+1)+'月'):fmt(d)):'')+'</div>';
+  }
+  let h='<div class="grow head"><div class="gleft head"><b>タスク / 工程</b></div><div class="gtl"><div class="ghd">'+hd+'</div></div></div>';
+  // 今日線位置
+  const todayX=230+(dayDiff(min,today)+0.5)*colW;
+  DATA.tasks.forEach((t,ti)=>{
+    // タスク見出し行（全工程の最小〜最大を薄い帯で）
+    let ts=null,te=null;t.steps.forEach(s=>{const a=D(s.s),b=D(s.e);if(!ts||a<ts)ts=a;if(!te||b>te)te=b;});
+    const doneAll=t.steps.length&&t.steps.every(s=>s.p>=100);
+    h+='<div class="grow"><div class="gleft"><div class="tasktitle"><span class="gtask">'+esc(t.name)+'</span>'+(doneAll?'<span class="mini">完了</span>':'<span class="mini">'+t.steps.length+'工程</span>')+'<span class="del" data-delt="'+ti+'">削除</span></div><span class="addstep" data-addstep="'+ti+'">＋ 工程を追加</span></div><div class="gtl"><div class="gcols">'+cols+'</div></div></div>';
+    // 工程行
+    t.steps.forEach((s,si)=>{
+      const a=D(s.s),b=D(s.e),x=(dayDiff(min,a))*colW,w=Math.max(colW*0.6,(dayDiff(a,b)+1)*colW);
+      const col=cssv(s.c||'--c1');
+      h+='<div class="grow"><div class="gleft"><span class="gstep">▸ '+esc(s.name)+'</span><span class="del" data-dels="'+ti+','+si+'">×</span></div>'
+        +'<div class="gtl"><div class="gcols">'+cols+'</div>'
+        +'<div class="gbar" data-edit="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
+        +(s.p>0?'<i class="pf" style="width:'+Math.min(100,s.p)+'%"></i>':'')
+        +'<span>'+esc(s.name)+'（'+fmt(a)+'〜'+fmt(b)+'）'+(s.p>0?' '+s.p+'%':'')+'</span></div></div></div>';
+    });
+  });
+  g.style.width=totalW+'px';g.innerHTML=h;
+  // 今日線（ヘッダー下〜全体）
+  const tl=document.createElement('div');tl.className='today';tl.style.left=todayX+'px';tl.style.top='0';
+  tl.innerHTML='<div class="lbl">今日 '+fmt(today)+'</div>';g.appendChild(tl);
+  document.getElementById('foot').innerHTML='帯をクリックで編集、「＋工程を追加」で工程追加。データはこのPCに自動保存されます（念のため「💾書き出し」でバックアップを）。今日＝'+fmt(today)+'。';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+/* ===== 追加・編集モーダル ===== */
+function openTask(){
+  showModal('<h2>タスクを追加</h2>'
+   +'<div class="frow"><label>タスク名</label><input id="m_name" placeholder="例：入金ツール改修"></div>'
+   +'<div class="frow"><label>最初の工程名</label><input id="m_step" placeholder="例：要件整理"></div>'
+   +'<div class="frow two"><div><label>開始日</label><input id="m_s" type="date" value="'+dkey(today)+'"></div><div><label>終了日</label><input id="m_e" type="date" value="'+dkey(addDays(today,4))+'"></div></div>'
+   +swatchHtml('--c1')
+   +'<div class="mact"><button class="btn sub" onclick="closeModal()">やめる</button><button class="btn" id="m_ok">追加</button></div>');
+  document.getElementById('m_ok').onclick=()=>{
+    const nm=val('m_name')||'新しいタスク';
+    DATA.tasks.push({id:'t'+Date.now(),name:nm,steps:[{name:val('m_step')||'工程1',s:val('m_s'),e:val('m_e'),c:selColor,p:0}]});
+    save();closeModal();render();
+  };
+}
+function openStep(ti,si){
+  const editing=si!=null;const s=editing?DATA.tasks[ti].steps[si]:null;
+  showModal('<h2>'+(editing?'工程を編集':'工程を追加')+'　<span style="color:var(--sub);font-weight:400;font-size:12px">'+esc(DATA.tasks[ti].name)+'</span></h2>'
+   +'<div class="frow"><label>工程名</label><input id="m_step" value="'+(s?esc(s.name):'')+'" placeholder="例：開発 / チェック / 資料作成"></div>'
+   +'<div class="frow two"><div><label>開始日</label><input id="m_s" type="date" value="'+(s?s.s:dkey(today))+'"></div><div><label>終了日</label><input id="m_e" type="date" value="'+(s?s.e:dkey(addDays(today,4)))+'"></div></div>'
+   +'<div class="frow"><label>進捗 <b id="pv">'+(s?s.p:0)+'</b>%</label><input id="m_p" type="range" min="0" max="100" step="10" value="'+(s?s.p:0)+'" oninput="document.getElementById(\'pv\').textContent=this.value"></div>'
+   +swatchHtml(s?s.c:'--c1')
+   +'<div class="mact">'+(editing?'<button class="btn sub" id="m_del" style="color:var(--todayln);margin-right:auto">削除</button>':'')+'<button class="btn sub" onclick="closeModal()">やめる</button><button class="btn" id="m_ok">保存</button></div>');
+  document.getElementById('m_ok').onclick=()=>{
+    const o={name:val('m_step')||'工程',s:val('m_s'),e:val('m_e'),c:selColor,p:+val('m_p')||0};
+    if(editing)DATA.tasks[ti].steps[si]=o;else DATA.tasks[ti].steps.push(o);
+    save();closeModal();render();
+  };
+  if(editing){document.getElementById('m_del').onclick=()=>{DATA.tasks[ti].steps.splice(si,1);save();closeModal();render();};}
+}
+let selColor='--c1';
+function swatchHtml(cur){selColor=cur||'--c1';return '<div class="frow"><label>色</label><div class="swatch" id="sw">'+COLORS.map(c=>'<i data-c="'+c+'" class="'+(c===selColor?'on':'')+'" style="background:'+cssv(c)+'"></i>').join('')+'</div></div>';}
+function val(id){const el=document.getElementById(id);return el?el.value.trim():'';}
+function showModal(html){document.getElementById('modal').innerHTML=html;document.getElementById('mask').classList.add('on');
+  const sw=document.getElementById('sw');if(sw)sw.onclick=e=>{const i=e.target.closest('i[data-c]');if(i){selColor=i.dataset.c;sw.querySelectorAll('i').forEach(x=>x.classList.toggle('on',x===i));}};}
+function closeModal(){document.getElementById('mask').classList.remove('on');}
+document.getElementById('mask').onclick=e=>{if(e.target.id==='mask')closeModal();};
+/* ===== イベント ===== */
+document.getElementById('addTask').onclick=openTask;
+document.getElementById('demoBtn').onclick=()=>{ if(DATA.tasks.length&&!confirm('サンプルデータを入れます。今のデータは置き換わります（書き出しでバックアップ推奨）。よろしいですか？'))return; DATA=demo();save();render(); };
+document.getElementById('expBtn').onclick=()=>{ const blob=new Blob([JSON.stringify(DATA,null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='タスク工程_'+dkey(new Date())+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000); };
+document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{ try{const d=JSON.parse(r.result);if(d&&d.tasks){ if(DATA.tasks.length&&!confirm('読み込んだデータで置き換えます。よろしいですか？')){e.target.value='';return;} DATA=d;save();render(); }else alert('タスク工程のJSONではないようです。'); }catch(x){alert('読み込めませんでした：'+x.message);} e.target.value=''; };
+  r.readAsText(f); };
+document.getElementById('scaleSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(b){scale=b.dataset.s;document.querySelectorAll('#scaleSeg button').forEach(x=>x.classList.toggle('on',x===b));render();}};
+document.getElementById('gant').onclick=e=>{
+  const eb=e.target.closest('[data-edit]');if(eb){const[t,s]=eb.dataset.edit.split(',').map(Number);openStep(t,s);return;}
+  const as=e.target.closest('[data-addstep]');if(as){openStep(+as.dataset.addstep,null);return;}
+  const dt=e.target.closest('[data-delt]');if(dt){if(confirm('このタスクを削除しますか？')){DATA.tasks.splice(+dt.dataset.delt,1);save();render();}return;}
+  const ds=e.target.closest('[data-dels]');if(ds){const[t,s]=ds.dataset.dels.split(',').map(Number);DATA.tasks[t].steps.splice(s,1);save();render();return;}
+};
+render();
+if(GAS_URL)pullGas(); else setGas('off');
+</script></body></html>
