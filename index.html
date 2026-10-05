@@ -32,9 +32,13 @@ input,select{background:var(--card);color:var(--ink);border:1px solid var(--line
 .gcol.m0{background:color-mix(in srgb,var(--acc) 5%,transparent)}
 .ghd{display:flex}.ghd .t{flex:1;text-align:center;font-size:10.5px;color:var(--sub);padding:5px 0;border-right:1px solid var(--line);white-space:nowrap}
 .ghd .t.mstart{font-weight:800;color:var(--ink)}
-.gbar{position:absolute;top:7px;height:22px;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;cursor:pointer;z-index:1;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.gbar{position:absolute;top:7px;height:22px;border-radius:7px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;cursor:grab;z-index:1;box-shadow:0 1px 3px rgba(0,0,0,.15);touch-action:none;user-select:none}
+.gbar.dragging{cursor:grabbing;opacity:.9;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:5}
 .gbar .pf{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);border-right:2px solid rgba(255,255,255,.7)}
-.gbar span{position:relative;z-index:1}
+.gbar .glbl{position:relative;z-index:1;pointer-events:none}
+.gbar .gh{position:absolute;top:0;bottom:0;width:9px;z-index:2;cursor:col-resize;background:rgba(255,255,255,.001)}
+.gbar .gh.l{left:0;border-radius:7px 0 0 7px}.gbar .gh.r{right:0;border-radius:0 7px 7px 0}
+.gbar .gh:hover{background:rgba(255,255,255,.35)}
 .tasktitle{display:flex;align-items:center;gap:8px}
 .tasktitle .mini{font-size:10px;color:var(--sub);font-weight:400;background:var(--bg);border-radius:20px;padding:1px 8px}
 .today{position:absolute;top:0;bottom:0;width:2px;background:var(--todayln);z-index:2}
@@ -107,6 +111,7 @@ function demo(){
   ]};
 }
 let scale='week',today=new Date();today.setHours(0,0,0,0);
+let GCTX={colW:22,min:null};   // ドラッグ計算用（1日あたり幅・左端の日付）
 const D=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c);};
 const fmt=d=>(d.getMonth()+1)+'/'+d.getDate();
 const dkey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -147,12 +152,13 @@ function render(){
       const col=cssv(s.c||'--c1');
       h+='<div class="grow"><div class="gleft"><span class="gstep">▸ '+esc(s.name)+'</span><span class="del" data-dels="'+ti+','+si+'">×</span></div>'
         +'<div class="gtl"><div class="gcols">'+cols+'</div>'
-        +'<div class="gbar" data-edit="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
+        +'<div class="gbar" data-bar="'+ti+','+si+'" style="left:'+x+'px;width:'+w+'px;background:'+col+'">'
         +(s.p>0?'<i class="pf" style="width:'+Math.min(100,s.p)+'%"></i>':'')
-        +'<span>'+esc(s.name)+'（'+fmt(a)+'〜'+fmt(b)+'）'+(s.p>0?' '+s.p+'%':'')+'</span></div></div></div>';
+        +'<i class="gh l"></i><i class="gh r"></i>'
+        +'<span class="glbl">'+esc(s.name)+'（'+fmt(a)+'〜'+fmt(b)+'）'+(s.p>0?' '+s.p+'%':'')+'</span></div></div></div>';
     });
   });
-  g.style.width=totalW+'px';g.innerHTML=h;
+  g.style.width=totalW+'px';g.innerHTML=h;GCTX.colW=colW;GCTX.min=min;
   // 今日線（ヘッダー下〜全体）
   const tl=document.createElement('div');tl.className='today';tl.style.left=todayX+'px';tl.style.top='0';
   tl.innerHTML='<div class="lbl">今日 '+fmt(today)+'</div>';g.appendChild(tl);
@@ -205,11 +211,38 @@ document.getElementById('impFile').onchange=e=>{ const f=e.target.files[0];if(!f
   r.readAsText(f); };
 document.getElementById('scaleSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(b){scale=b.dataset.s;document.querySelectorAll('#scaleSeg button').forEach(x=>x.classList.toggle('on',x===b));render();}};
 document.getElementById('gant').onclick=e=>{
-  const eb=e.target.closest('[data-edit]');if(eb){const[t,s]=eb.dataset.edit.split(',').map(Number);openStep(t,s);return;}
+  if(_justDragged){_justDragged=false;return;}   // ドラッグ直後のクリックは無視
   const as=e.target.closest('[data-addstep]');if(as){openStep(+as.dataset.addstep,null);return;}
   const dt=e.target.closest('[data-delt]');if(dt){if(confirm('このタスクを削除しますか？')){DATA.tasks.splice(+dt.dataset.delt,1);save();render();}return;}
   const ds=e.target.closest('[data-dels]');if(ds){const[t,s]=ds.dataset.dels.split(',').map(Number);DATA.tasks[t].steps.splice(s,1);save();render();return;}
 };
+/* ===== 帯のドラッグ（移動＝期間ごと前後／端で伸縮） ===== */
+let _justDragged=false;
+document.getElementById('gant').addEventListener('pointerdown',e=>{
+  const bar=e.target.closest('.gbar[data-bar]');if(!bar)return;
+  e.preventDefault();
+  const[ti,si]=bar.dataset.bar.split(',').map(Number);const st=DATA.tasks[ti].steps[si];
+  const mode=e.target.classList.contains('gh')?(e.target.classList.contains('l')?'l':'r'):'move';
+  const startX=e.clientX,colW=GCTX.colW,sa=D(st.s),eb=D(st.e),span=dayDiff(sa,eb);
+  const lbl=bar.querySelector('.glbl');bar.classList.add('dragging');bar.setPointerCapture(e.pointerId);
+  let moved=false,delta=0;
+  function mv(ev){ const dx=ev.clientX-startX; if(Math.abs(dx)>3)moved=true; delta=Math.round(dx/colW);
+    let ns=new Date(sa),ne=new Date(eb);
+    if(mode==='move'){ns=addDays(sa,delta);ne=addDays(eb,delta);}
+    else if(mode==='l'){ns=addDays(sa,Math.min(delta,span));if(ns>ne)ns=new Date(ne);}
+    else{ne=addDays(eb,Math.max(delta,-span));if(ne<ns)ne=new Date(ns);}
+    const x=dayDiff(GCTX.min,ns)*colW,w=Math.max(colW*0.6,(dayDiff(ns,ne)+1)*colW);
+    bar.style.left=x+'px';bar.style.width=w+'px';
+    if(lbl)lbl.textContent=esc(st.name)+'（'+fmt(ns)+'〜'+fmt(ne)+'）'+(st.p>0?' '+st.p+'%':'');
+    bar._ns=ns;bar._ne=ne;
+  }
+  function up(ev){ bar.classList.remove('dragging');try{bar.releasePointerCapture(e.pointerId);}catch(x){}
+    document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up);
+    if(moved&&bar._ns){ st.s=dkey(bar._ns);st.e=dkey(bar._ne);save();_justDragged=true;render(); }
+    else{ _justDragged=false; openStep(ti,si); }   // 動いていなければクリック＝編集
+  }
+  document.addEventListener('pointermove',mv);document.addEventListener('pointerup',up);
+});
 render();
 if(GAS_URL)pullGas(); else setGas('off');
 </script></body></html>
